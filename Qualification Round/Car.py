@@ -5,6 +5,10 @@ class Car:
         self.pathLength = pathLength
         self.streetNames = streetNames
         self.routeCost = routeCost
+        self.arrivalTime = 0
+
+    def setArrivalTime(self, newTime):
+        self.arrivalTime = newTime
 
     def print(self):
         print("\t\tCar Number: " + str(self.number))

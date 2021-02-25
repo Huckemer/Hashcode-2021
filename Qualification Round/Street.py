@@ -6,9 +6,16 @@ class Street:
         self.name = name
         self.length = int(length)
         self.cars = []
+        self.light = 'R'
 
     def addCar(self, car):
         self.cars.append(car)
+
+    def setGreen(self):
+        self.light = 'G'
+    
+    def setRed(self):
+        self.light = 'R'
 
     def print(self):
         print("Street: " + self.name)

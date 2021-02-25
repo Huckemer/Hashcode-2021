@@ -4,17 +4,11 @@ from Intersection import Intersection
 from Street import Street
 
 def main():
+    # open the input file for reading
     inputFile = open('C:/Users/colin/Documents/GitHub/Hashcode-2021/Qualification Round/a.txt',"r")
 
-    lineCount = 0
+    # extract the data from the input file
     data = []
-    cars = {}
-    streets = {}
-    intersections = {}
-    incoming = {}
-    idealPath = []
-    currentState = {}
-
     for line in inputFile:
         data.append(line.split())
 
@@ -30,10 +24,29 @@ def main():
     # bonus points for each car that reaches its destination before d
     f = int(temp[4])
 
-    # adding the streets
+    # the ideal order to send the cars in
+    idealOrder = []
+    # the current locations of the cars
+    currentState = {}
+
+    # cars waiting at the lights. number: Car Object
+    waiting = {}
+    # cars driving on the streets and how far they have to go. number: Car Object
+    driving = {}
+    # log of lights switched to green and when. streetName: [(time changed, color, intersection)]
+    log = {}
+
+    # the intersections/nodes. number: Intersection Object
+    intersections = {}
+    # the streets/edges between intersections/nodes. streetName: (start, end, Street Object)
+    streets = {}
+    # the cars traveling in the city/graph. number: Car Object
+    cars = {}
+
+    # adding the streets/edges
     while s > 0 and len(data) > 0:
         temp = data.pop(0)
-        streets[temp[2]] = (Street(temp[0], temp[1], temp[2], temp[3]))
+        streets[temp[2]] = (int(temp[0]), int(temp[1]), Street(temp[0], temp[1], temp[2], temp[3]))
         s -= 1
 
     # adding the cars
@@ -42,81 +55,121 @@ def main():
         temp = data.pop(0)
         tempCar = Car(carCount, temp[0], temp[1:], calculateCost(streets, temp[1:]))
         cars[carCount] = tempCar
-        idealPath.append((carCount, tempCar.pathLength))
-        streets[temp[1]].addCar(tempCar)
+        waiting[carCount] = tempCar
+        idealOrder.append((carCount, tempCar.pathLength))
         v -= 1
         carCount += 1
 
-    # adding the intersections
+    # adding the intersections/nodes
     for num in range(i):
         intersections[num] = Intersection(num)
 
-    # filling in the intersections
+    # fill in which streets are possible lights
     for street in streets:
-        intersections[streets[street].end].addIncoming(streets[street])
-        intersections[streets[street].start].addOutgoing(streets[street])
-
-    # pairing the intersections
-    for intersection in intersections:
-        for street in intersections[intersection].incomingStreets:
-            incoming[street.name] = intersection
-
-    # set the current state
-    for car in cars:
-        currentIntersection = 0
-        # print("car: " + str(car))
-        for intersection in intersections:
-            # print("intersection: " + str(intersection))
-            # print("street: " + str(cars[car].streetNames[0]))
-            for street in intersections[intersection].incomingStreets:
-                if cars[car].streetNames[0] == street.name:
-                    # print("found")
-                    currentIntersection = intersection
-                    break
-        currentState[cars[car].number] = currentIntersection
+        intersections[streets[street][2].end].addIncoming(streets[street][2].name)
 
     # optimize the car order
-    idealPath.sort(key = lambda x: x[1])
+    idealOrder.sort(key = lambda x: x[1])
 
-    # print(d, i, s, v, f)
+    # PRINT STATEMENTS
+    print(d, i, s, v, f)
+    print("Waiting:")
+    print(waiting)
+    print("Driving:")
+    print(driving)
     # for intersection in intersections:
     #     intersections[intersection].print()
-    # for street in streets:
-    #     streets[street].print()
-    print(incoming)
-    print(idealPath)    
-    # print(currentState)
+    print("Ideal Order:")
+    print(idealOrder)    
 
-    for time in range(d):
-        moveCar(streets, cars[idealPath[0][0]], currentState, idealPath)
-        print(currentState)
+    # SIMULATION
+    for currentTime in range(d):
+        # if the most ideal car is waiting, change the light to green
+        if idealOrder[0][0] in waiting:
+            car = waiting[idealOrder[0][0]]
+            # if the intersection already has a green light, change that to red
+            for incomingStreet in intersections[streets[car.streetNames[0]][1]].incomingStreets:
+                if streets[incomingStreet][2].light == 'G':
+                    streets[incomingStreet][2].setRed()
+            print("Car: " + str(car.number) + " let through intersection: " + str(streets[car.streetNames[0]][1]))
+            # change the light to green
+            streets[car.streetNames[0]][2].setGreen()
+            # change the car's current location
+            car.streetNames.pop(0)
+            # when the car goes through the light, change it to driving
+            driving[idealOrder[0][0]] = waiting[idealOrder[0][0]]
+            del waiting[idealOrder[0][0]]
+            # set the driving car's arrival time
+            car.setArrivalTime(currentTime + streets[car.streetNames[0]][2].length)
 
+        # if the most ideal car is driving, check the next most ideal to see if it's waiting
+        else:
+            for pair in idealOrder:
+                if pair[0] in waiting:
+                    car = waiting[pair[0]]
+                    # if the intersection already has a green light, change that to red
+                    for incomingStreet in intersections[streets[car.streetNames[0]][1]].incomingStreets:
+                        if streets[incomingStreet][2].light == 'G':
+                            streets[incomingStreet][2].setRed()
+                    print("Car: " + str(car.number) + " let through intersection: " + str(streets[car.streetNames[0]][1]))
+                    # change the light to green
+                    streets[car.streetNames[0]][2].setGreen()
+                    # change the car's current location
+                    car.streetNames.pop(0)
+                    # when the car goes through the light, change it to driving
+                    driving[pair[0]] = waiting[pair[0]]
+                    del waiting[pair[0]]
+                    # set the driving car's arrival time
+                    car.setArrivalTime(currentTime + streets[car.streetNames[0]][2].length)
 
+        # if any cars are driving on their destination street, remove them
+        # if a driving car's arrival time is the current time, move them to waiting for their light
+        finished = []
+        for car in driving:
+            if len(driving[car].streetNames) == 1:
+                finished.append(car)
+            elif driving[car].arrivalTime == currentTime:
+                waiting[car] = driving[car]
+                finished.append(0)
+        for car in finished:
+            del driving[car]
+        
+
+    # write the log to the file in the correct format
     outputFile = open("output.txt", "w")
     print("\n--------WRITING TO FILE---------")
-    outputFile.write(str(len(intersections)))
-    outputFile.close()
-    print("--------DONE WRITING---------")
+    # amount of intersections with schedules
+    scheduledIntersections = 0
+    # all intersections on schedule
+    finalIntersections = []
+    for intersection in intersections:
+        for street in intersections[intersection].incomingStreets:
+            if streets[street][2].name in log:
+                scheduledIntersections += 1
+                finalIntersections.append([intersection, streets[street][2].name, log[streets[street][2].name][0][1] - log[streets[street][2].name][0][0]])
+    outputFile.write(str(scheduledIntersections))
+    # sort the entries chronologically
+    finalIntersections.sort(key = lambda x: x[2])
+    # for all intersections on schedule
+    for entry in finalIntersections:
+        # intersection on schedule
 
-# calculate the route cost for the car
+        # amount of lights changed in intersection
+        
+        # names of streets changed in order, and for how long
+        
+        pass
+
+    print("...")
+    outputFile.close()
+    print("----------DONE WRITING----------")
+
+# calculate the total intended path length for the car
 def calculateCost(streets, path):
     cost = 0
     for street in path:
-        cost += streets[street].length
+        cost += streets[street][2].length
     return cost
-
-def moveCar(streets, car, currentState, idealPath):
-    oldStreet = car.streetNames[0]
-    if len(car.streetNames) > 1:
-        car.streetNames.pop(0)
-        streets[car.streetNames[0]].addCar(car)
-        # currentState[car.number] = 
-        streets[oldStreet].cars.remove(car)
-    else:
-        streets[oldStreet].cars.remove(car)
-        del currentState[car.number]
-        del idealPath[car.number]
-
 
 if __name__ == "__main__":
     main()
